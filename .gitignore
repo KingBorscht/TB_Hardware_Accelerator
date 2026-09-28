@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Vivado / FPGA build artifacts
+build/
+*.bit
+*.hwh
+*.xpr
+.Xil/
+*.jou
+*.log
+
+# Simulation
+*.vcd
+
+# Raw datasets (never commit)
+data/raw/
