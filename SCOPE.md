@@ -43,25 +43,27 @@ Anything marked PROVISIONAL is an assumption to be confirmed by the owner. Do no
 - Affine gap penalties in hardware (documented as a limitation and stretch goal).
 - Clinical claims beyond sensitivity/specificity against the WHO catalogue.
 
-## Roles
+## Tasks
 
-| Role | Owner |
-|------|-------|
-| Algorithm / quantization lead | |
-| RTL / kernel lead | |
-| Memory / DMA lead | |
-| Verification lead | |
-| Benchmarking lead | |
-| Bring-up / integration lead | |
-| Bio lead (references, catalogue, test reads, validation) | |
+| Role |
+|------|
+| Algorithm / quantization lead |
+| RTL / kernel lead |
+| Memory / DMA lead |
+| Verification lead |
+| Benchmarking lead |
+| Bring-up / integration lead |
+| Bio lead (references, catalogue, test reads, validation) |
 
-One owner per row. Doubling up is fine, but every subsystem has one named person accountable for it.
 
 ## Open questions
 
 - Exact hotspot list and coordinates (see decisions 1 and 3).
 - Which CRyPTIC subset to use, and its read structure.
 - Whether affine gaps matter for the mutations in scope (many resistance-relevant variants are SNPs, but indels near hotspot boundaries are a required test case).
+- Possibility of leaning towards nanopore sequencing; requires restructuring of large pillars of the project
+- Exact loci used in the project (may expand from 3 to entire WHO drug-resistance gene panel)
+- Pursue the raw-signal angle (adaptive sampling / sDTW) instead of basecalled-sequence alignment? this becomes a different algorithm entirely from Smith Waterman
 
 ## Change log
 
