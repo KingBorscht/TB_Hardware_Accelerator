@@ -45,15 +45,15 @@ Anything marked PROVISIONAL is an assumption to be confirmed by the owner. Do no
 
 ## Tasks
 
-| Role |
+| Focuses |
 |------|
-| Algorithm / quantization lead |
-| RTL / kernel lead |
-| Memory / DMA lead |
-| Verification lead |
-| Benchmarking lead |
-| Bring-up / integration lead |
-| Bio lead (references, catalogue, test reads, validation) |
+| Algorithm / quantization |
+| RTL / kernel |
+| Memory / DMA |
+| Verification |
+| Benchmarking |
+| Bring-up / integration |
+| Bio (references, catalogue, test reads, validation) |
 
 
 ## Open questions
