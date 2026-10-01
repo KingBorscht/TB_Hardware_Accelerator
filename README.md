@@ -55,7 +55,7 @@ cd TB_Hardware_Accelerator
 
 ## Status
 
-🚧 Active development — see [`SCOPE.md`](./SCOPE.md) change log for the latest decisions.
+Active development — see [`SCOPE.md`](./SCOPE.md) change log for the latest decisions.
 
 ## License
 
