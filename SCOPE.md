@@ -45,15 +45,15 @@ Anything marked PROVISIONAL is an assumption to be confirmed by the owner. Do no
 
 ## Tasks
 
-| Focuses |
-|------|
-| Algorithm / quantization |
-| RTL / kernel |
-| Memory / DMA |
-| Verification |
-| Benchmarking |
-| Bring-up / integration |
-| Bio (references, catalogue, test reads, validation) |
+| Focus | Details |
+|-------|-----------------|
+| Algorithm / quantization | banded SW design, precision study, software reference model |
+| RTL / kernel | systolic array PE design, Verilog/HLS, testbenches |
+| Memory / DMA | AXI DMA architecture, PYNQ block design, cache-coherency handling |
+| Verification | simulation infra, bit-exact validation, test-vector coverage |
+| Benchmarking | GPU/CPU baseline implementation, fair-comparison methodology, power-measurement setup |
+| Bring-up / integration | timing closure, constraints, bitstream generation, hardware debugging |
+| Bio | references, catalogue, test reads, validation |
 
 
 ## Open questions
