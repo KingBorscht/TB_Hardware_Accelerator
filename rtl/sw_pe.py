@@ -90,17 +90,24 @@ class SmithWatermanPE(Elaboratable):
         m.d.comb += f_extended.eq(f_ext > f_open)
         m.d.comb += self.f.eq(Mux(f_extended, f_ext, f_open))
 
+        e_wins = Signal()
+        diag_wins = Signal()
+        all_zero = Signal()
         best_ef = Signal(width)
-        m.d.comb += best_ef.eq(Mux(self.e >= self.f, self.e, self.f))
-        m.d.comb += self.h.eq(Mux(diag_cand >= best_ef, diag_cand, best_ef))
+        m.d.comb += e_wins.eq(self.e >= self.f)
+        m.d.comb += best_ef.eq(Mux(e_wins, self.e, self.f))
+        m.d.comb += diag_wins.eq(diag_cand >= best_ef)
+        m.d.comb += all_zero.eq((diag_cand == 0) & (best_ef == 0))
+        m.d.comb += self.h.eq(Mux(diag_wins, diag_cand, best_ef))
 
-        # tie-break order: diag, then left, then up; h == 0 stops
+        # tie-break order: diag, then left, then up; h == 0 stops.
+        # Decided from the comparisons above so it doesn't wait on h.
         source = Signal(2)
-        with m.If(self.h == 0):
+        with m.If(all_zero):
             m.d.comb += source.eq(TB_STOP)
-        with m.Elif(diag_cand == self.h):
+        with m.Elif(diag_wins):
             m.d.comb += source.eq(TB_DIAG)
-        with m.Elif(self.e == self.h):
+        with m.Elif(e_wins):
             m.d.comb += source.eq(TB_LEFT)
         with m.Else():
             m.d.comb += source.eq(TB_UP)
