@@ -1,0 +1,3 @@
+# read_id	amplicon_id	aligned	best_score	query_begin	query_end	reference_begin	reference_end	cigar	normalized_read_sequence
+read-ref	0	1	8	0	4	0	4	4M	ACGT
+read-alt	0	1	6	0	4	0	4	4M	ATGT

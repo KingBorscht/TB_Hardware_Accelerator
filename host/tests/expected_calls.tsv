@@ -1,0 +1,2 @@
+catalogue_id	amplicon_id	gene	annotation	h37rv_position	reference	alternate	eligible_coverage	alt_count	allele_fraction	status	ref_count	other_count	ambiguous_count	not_covered_count	reference_version	catalogue_version
+TEST-C2T	0	test_gene	p.Test	101	C	T	2	1	0.5	INSUFFICIENT_COVERAGE	1	0	0	0	NC_000962.3	WHO-test
