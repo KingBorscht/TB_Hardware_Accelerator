@@ -1,0 +1,365 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\DeclareMathOperator{\score}{score}
+\DeclareMathOperator{\Bin}{Bin}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\newcommand{\W}{\mathcal{W}}
+\newcommand{\A}{\mathcal{A}}
+\newcommand{\klo}{k_{\mathrm{lo}}}
+\newcommand{\khi}{k_{\mathrm{hi}}}
+\newcommand{\kaplo}{\kappa_{\mathrm{lo}}}
+\newcommand{\kaphi}{\kappa_{\mathrm{hi}}}
+\newcommand{\Sseg}{S_{\mathrm{seg}}}
+
+\newcounter{prob}
+\newcommand{\problem}[1]{\refstepcounter{prob}\medskip\noindent\textbf{Problem \theprob} (#1)\textbf{.}\ }
+\newcommand{\easy}{$\star$}
+\newcommand{\medium}{$\star\star$}
+\newcommand{\hard}{$\star\star\star$}
+
+\title{Proof Problems for the Alignment Kernel}
+\author{TB Hardware Accelerator project}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+Our project lines up two strings of DNA letters to find where they differ. The
+standard method fills in a whole table. Our design first guesses where the
+answer lies (the \emph{vote}) and then fills in only a narrow strip of the table
+(the \emph{window}). The statements below say how much work this saves and when
+it is guaranteed to give the same answer.
+
+We have draft proofs, and nobody has checked them yet. \textbf{Please prove
+these by hand, without looking at the drafts.} Afterwards we will compare. If
+you find a statement that is false or needs an extra condition, that is the
+most useful result of all.
+
+\textbf{Take a whole part, not single problems.} The problems inside a part
+build on each other: the early ones are the steps and the last one is the goal.
+Section~\ref{sec:map} shows how the parts connect.
+
+Difficulty: \easy\ counting or a few lines, \medium\ a real argument, \hard\
+longer, usually induction. Write up each part as one piece, with the part
+letter and your names on it.
+
+\section{The rules}
+
+\begin{itemize}[nosep]
+\item The \emph{read} is $a = a_1 \dots a_m$ and the \emph{reference} is
+      $b = b_1 \dots b_n$. Letters are A, C, G, T.
+\item Scores: a match scores $M > 0$, a mismatch scores $x \le M$, and each
+      gapped letter scores $g < 0$. The project uses $M = 2$, $x = -1$,
+      $g = -2$, $m = 150$, $n \le 180$.
+\item $s(a_i,b_j) = M$ if $a_i = b_j$, and $x$ otherwise.
+\item \emph{Nodes} are pairs $(i,j)$ with $0 \le i \le m$ and $0 \le j \le n$.
+      A node with $i,j \ge 1$ is a \emph{cell}. The \emph{diagonal} of a node
+      is $j - i$.
+\item A \emph{path} is a sequence of steps. A diagonal step
+      $(i-1,j-1)\to(i,j)$ scores $s(a_i,b_j)$. A down step $(i-1,j)\to(i,j)$
+      and a right step $(i,j-1)\to(i,j)$ each score $g$; these are \emph{gap
+      steps}. The score of a path is the sum of its steps. The empty path
+      scores $0$.
+\end{itemize}
+
+\paragraph{The table.} $H(i,0) = H(0,j) = 0$, and for $i,j \ge 1$
+\begin{equation}\label{eq:sw}
+H(i,j) = \max\bigl\{\,0,\; H(i-1,j-1) + s(a_i,b_j),\; H(i-1,j) + g,\; H(i,j-1) + g \,\bigr\}.
+\end{equation}
+The answer is $S = \max_{i,j} H(i,j)$.
+
+\paragraph{A small example.} Reference GATTACA, read GATACA, with $M=2$,
+$x=-1$, $g=-2$:
+\begin{center}
+\begin{tabular}{c|rrrrrrr}
+  & G & A & T & T & A & C & A \\ \hline
+G & 2 & 0 & 0 & 0 & 0 & 0 & 0 \\
+A & 0 & 4 & 2 & 0 & 2 & 0 & 2 \\
+T & 0 & 2 & 6 & 4 & 2 & 1 & 0 \\
+A & 0 & 2 & 4 & 5 & 6 & 4 & 3 \\
+C & 0 & 0 & 2 & 3 & 4 & 8 & 6 \\
+A & 0 & 2 & 0 & 1 & 5 & 6 & 10
+\end{tabular}
+\end{center}
+Here $S = 10$. The best path uses one gap step: the read is missing one T.
+
+\section{How the parts connect}\label{sec:map}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}cp{0.33\textwidth}p{0.2\textwidth}p{0.22\textwidth}c@{}}
+\toprule
+Part & What it establishes & Problems & Needs & Level \\
+\midrule
+A & What the numbers in the table mean, and how big they can get & 1--4 & only the rules & \hard \\
+B & The score rewritten as a cost & 5 & only the rules & \medium \\
+C & When the window gives the same answer as the full table & 6--10 & Problem 1 from Part A & \medium \\
+D & When the vote is guaranteed to pick a good place & 11--15 & Problems 7 and 8 from Part C & \hard \\
+E & How much hardware and time each design needs & 16 & nothing & \easy \\
+F & Two separate bounds & 17--18 & nothing & \medium \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Parts A, B, E and F can each be done alone. Part C should be done by people who
+have read Problem 1. Part D should be done after Part C, or by a group that is
+willing to take Problems 7 and 8 as given. If you use a result from another
+part, quote it by its problem number; you do not have to prove it again.
+
+\section{Part A: the full table}
+
+\noindent\textbf{Level: \hard.} The hardest step is Problem 3, an induction
+with four cases. Skills: induction, careful case analysis. Rough time: 2 to 3
+hours.
+
+\noindent\textbf{Goal.} Problems 2 and 4: how large a score can be, and how few
+bits a cell needs. \textbf{Chain.} $1 \to 2$ and $3 \to 4$. Problem 1 says what
+$H$ means; Problem 3 is the long induction.
+
+\problem{\medium}
+Prove that $H(i,j)$ is the maximum score over all paths that end at the node
+$(i,j)$, the empty path included.
+
+\problem{\easy}
+Prove that $0 \le H(i,j) \le M\min(i,j)$. Deduce that $S \le M\min(m,n)$ and
+that $S$ fits in $\ceil{\log_2(M\min(m,n)+1)}$ bits. Evaluate this for the
+project values.
+
+\problem{\hard}
+Prove that for all $1 \le i \le m$ and $1 \le j \le n$:
+\begin{align*}
+g &\le H(i,j) - H(i,j-1) \le M - g, \\
+g &\le H(i,j) - H(i-1,j) \le M - g, \\
+x &\le H(i,j) - H(i-1,j-1) \le M.
+\end{align*}
+
+\problem{\easy}
+Using Problem 3, how many different values can a side-by-side difference take?
+A same-diagonal difference? How many bits does each need? Evaluate for the
+project values.
+
+\section{Part B: score as a cost}
+
+For a path $P$ from $(i_0,j_0)$ to $(i_1,j_1)$ let $\mu$, $\nu$, $\gamma$ be its
+numbers of matches, mismatches and gap steps, and let
+$u = i_0 + (m-i_1) + j_0 + (n-j_1)$ be the number of letters it leaves
+unaligned. Define
+\[
+c(P) = (M-x)\,\nu + \Bigl(\frac{M}{2}-g\Bigr)\gamma + \frac{M}{2}\,u .
+\]
+
+\noindent\textbf{Level: \medium.} One identity. Skills: algebra and keeping
+track of what each step of a path uses up. Rough time: 30 minutes.
+
+\noindent\textbf{Goal.} Problem 5, a single identity. It uses nothing except
+the rules.
+
+\problem{\medium}
+Prove that $\score(P) = \frac{M}{2}(m+n) - c(P)$ for every path $P$. Deduce
+that $S = \frac{M}{2}(m+n) - \min_P c(P)$. What are the three cost
+coefficients for the project values?
+
+\section{Part C: the window}
+
+Fix an integer $d_0$ and a half-width $w \ge 0$, and let $W = 2w+1$. The
+\emph{window} is the set of cells
+\[
+\W = \bigl\{(i,j) : 1\le i\le m,\ 1\le j\le n,\ \abs{j-i-d_0}\le w\bigr\}.
+\]
+$H_{\W}$ is defined by the recurrence \eqref{eq:sw} on the cells of $\W$ and is
+$0$ at every other node. Let $S_{\W} = \max H_{\W}$. A path is
+\emph{admissible} if every node on it, except possibly its start node, is a
+cell of $\W$.
+
+\noindent\textbf{Level: \medium.} The hardest step is Problem 7, an induction.
+The rest are short once 7 is done. Skills: induction, reasoning about subsets.
+Rough time: 1.5 to 2 hours.
+
+\noindent\textbf{Goal.} Problem 10: if the best path fits in the window, the
+window gives the same answer. \textbf{Chain.} Problem 6 stands alone and says
+how much work is saved. Then $7 \to 8$, and $7, 8, 9 \to 10$. Problem 7 is the
+window version of Problem 1 and can follow the same pattern.
+
+\problem{\easy}
+Prove that $\abs{\W} \le mW$. What fraction of the full table is this for
+$m=150$, $n=180$, $w=8$?
+
+\problem{\medium}
+Prove that for a cell $(i,j)\in\W$, $H_{\W}(i,j)$ is the maximum score over
+admissible paths ending at $(i,j)$, the empty path included.
+
+\problem{\easy}
+Prove that $S_{\W} \le S$.
+
+\problem{\medium}
+Prove that the diagonals of the nodes of a path form a set of consecutive
+integers $\{\klo,\dots,\khi\}$, and that $\khi - \klo$ is at most the number of
+gap steps of the path.
+
+\problem{\medium}
+Suppose $S > 0$ and some path $P^{*}$ with $\score(P^{*}) = S$ has diagonal
+range $[\klo,\khi]$ with $\khi - w \le d_0 \le \klo + w$. Prove that
+$S_{\W} = S$. Show that the condition holds whenever $d_0$ is one of the
+diagonals of $P^{*}$ and $P^{*}$ has at most $w$ gap steps.
+
+\section{Part D: the vote}
+
+In this part indices start at $0$: the read is $r_0\dots r_{m-1}$, the window
+of the reference is $b_0\dots b_{n-1}$, and diagonal $k$ pairs $r_i$ with
+$b_{i+k}$. Fix $\lambda \ge 0$. For $-(m-1)\le k\le n-1$ let
+\begin{align*}
+I(k) &= \{\,i : 0\le i<m,\ 0\le i+k<n\,\}, & N(k) &= \abs{I(k)},\\
+V_r(k) &= \abs[\big]{\{\,i\in I(k) : r_i = b_{i+k}\,\}}, &
+Z_r(k) &= (1+\lambda)V_r(k) - \lambda N(k).
+\end{align*}
+The vote returns a diagonal $d_0$ that maximises $Z_r$.
+
+\paragraph{Read model.} Let $E$ be the genome around the window, with
+$b_j = E[\omega+j]$. A \emph{template} $t_0\dots t_{m-1}$ has a start $p$ and
+at most one indel of length $g$ at read position $q$:
+\begin{itemize}[nosep]
+\item no indel: $t_i = E[p+i]$;
+\item deletion: $t_i = E[p+i]$ for $i<q$, and $t_i = E[p+g+i]$ for $i\ge q$;
+\item insertion: $t_i = E[p+i]$ for $i<q$; $t_i$ is unconstrained for
+      $q\le i<q+g$; and $t_i = E[p-g+i]$ for $i\ge q+g$.
+\end{itemize}
+$F$ is the set of unconstrained positions. A read $r$ \emph{follows the
+template with at most $e$ substitutions} if $r_i = t_i$ for all $i\notin F$
+except at most $e$ positions.
+
+The \emph{true diagonals} are $k_1 = p-\omega$ and $k_2 = k_1$ (no indel),
+$k_1+g$ (deletion) or $k_1-g$ (insertion). Put $\kaplo = \min(k_1,k_2)$,
+$\kaphi = \max(k_1,k_2)$. The \emph{true alignment} $T$ pairs each read letter
+with the reference letter it was copied from. The set of \emph{acceptable}
+diagonals is $\A = \{d : \kaphi - w \le d \le \kaplo + w\}$. Define
+\[
+V^{-}(k) = \abs[\big]{\{\,i\in I(k)\setminus F : t_i = b_{i+k}\,\}},\qquad
+V^{+}(k) = V^{-}(k) + \abs{I(k)\cap F},
+\]
+$Z^{\pm}(k) = (1+\lambda)V^{\pm}(k) - \lambda N(k)$, and the \emph{margin}
+\[
+\Delta_\lambda = \max_{k\in\A} Z^{-}(k) - \max_{k\notin\A} Z^{+}(k).
+\]
+Here $k$ ranges over $-(m-1),\dots,n-1$. We assume $g \le 2w$, so that $\A$ is
+not empty. If every diagonal is acceptable, the second maximum is over an empty
+set and is taken to be $-\infty$.
+
+\noindent\textbf{Level: \hard.} The proofs are short; the difficulty is the
+amount of notation, and Problem 12 needs a chain of four inequalities in the
+right order. Skills: reading definitions precisely, inequalities, a little
+probability for Problem 14. Rough time: 2 to 3 hours.
+
+\noindent\textbf{Goal.} Problem 13: if the read has few enough substitutions,
+the window chosen by the vote contains the true alignment. \textbf{Chain.}
+$11 \to 12 \to 13$, and Problem 13 also uses Problems 7 and 8. Problem 14 follows
+from 12. Problem 15 is a separate count. Read the definitions above twice
+before starting; they are the hard part.
+
+\problem{\medium}
+Prove that if $r$ follows the template with at most $e$ substitutions, then
+$V^{-}(k) - e \le V_r(k) \le V^{+}(k) + e$ for every $k$.
+
+\problem{\hard}
+Prove: if $r$ follows the template with at most $e$ substitutions and
+$2(1+\lambda)e < \Delta_\lambda$, then every maximiser of $Z_r$ is acceptable.
+
+\problem{\medium}
+Under the hypothesis of Problem 12, prove that the window centred on $d_0$
+contains every diagonal of the true alignment $T$, and that
+$\score(T) \le S_{\W} \le S$.
+
+\problem{\medium}
+Suppose each read letter is substituted independently with probability
+$\varepsilon$, and the template tolerates $e^{*}$ substitutions in the sense of
+Problem 12. Prove that the probability that the vote is not acceptable is at
+most $\Pr[\Bin(m,\varepsilon) > e^{*}]$. Evaluate it for $m=150$, $e^{*}=19$,
+$\varepsilon = 0.02$.
+
+\problem{\easy}
+Prove that computing $V_r(k)$ for every $k$ by direct comparison uses exactly
+$mn$ comparisons of letters.
+
+\section{Part E: counting the hardware}
+
+A machine that fills the full table one anti-diagonal per clock tick uses
+$\min(m,n)$ cells and $m+n-1$ ticks, and stores $2mn$ bits of direction
+pointers. The window machine uses $W$ cells and $m$ ticks and stores $2mW$
+bits. The vote takes $m+n-1$ ticks.
+
+\noindent\textbf{Level: \easy.} Arithmetic and one inequality. A good place to
+start. Rough time: 20 minutes.
+
+\noindent\textbf{Goal.} Problem 16, which is counting only. Part (c) is the
+point of it.
+
+\problem{\easy}
+(a) Evaluate all of these for $m=150$, $n=180$, $W=17$.
+(b) A read goes through the vote and then the window. Is that more or fewer
+ticks than the full-table machine? Prove your answer for all $m,n\ge1$.
+(c) State precisely what the new design saves and what it does not.
+
+\section{Part F: two side results}
+
+\noindent\textbf{Level: \medium.} Problem 17 needs one neat inequality about
+three numbers; Problem 18 is one line. Rough time: 45 minutes.
+
+\noindent Problems 17 and 18 do not depend on each other or on anything else.
+
+\problem{\medium}
+Split the read into consecutive segments of length at most $\Sseg$. Segment $t$
+votes for a diagonal $d_t$. A row in segment $t$ computes the diagonals from
+$\min(d_{t-1},d_t,d_{t+1})-w$ to $\max(d_{t-1},d_t,d_{t+1})+w$ (a missing
+neighbour is left out). Let $G = \sum_t\abs{d_{t+1}-d_t}$. Prove that at most
+$mW + 2\Sseg G$ cells are computed.
+
+\problem{\easy}
+A read skips the window with probability $\rho$. The vote costs
+$C_{\mathrm{vote}}$ and the window costs $C_{\mathrm{SW}}$. Prove that the
+expected cost per read is $C_{\mathrm{vote}} + (1-\rho)\,C_{\mathrm{SW}}$.
+
+\section{Part G: open questions}
+
+\noindent\textbf{Level: unknown.} We do not have proofs of these. We do not
+know whether they are true. Q1 and Q4 look the hardest.
+
+\begin{enumerate}[label=\textbf{Q\arabic*.}]
+\item Under the read model of Part D, is $S_{\W} = S$? Problem 13 gives only
+      $\score(T)\le S_{\W}\le S$. Find a proof, an extra condition that makes
+      it true, or a counterexample.
+\item The condition $2(1+\lambda)e < \Delta_\lambda$ in Problem 12 assumes the
+      worst case for every substitution. Can it be weakened?
+\item With $\lambda = 0$ the margin can be negative for our sequences. Is there
+      a simple property of the reference that guarantees a positive margin?
+\item Extend Problem 12 to reads with two indels.
+\end{enumerate}
+
+\section*{Sign-up}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.7}
+\begin{tabular}{|c|c|c|c|p{0.28\textwidth}|c|c|}
+\hline
+Part & Problems & Level & Time & Names & Written & Checked by \\ \hline
+A & 1--4 & \hard & 2--3 h & & & \\ \hline
+B & 5 & \medium & 30 min & & & \\ \hline
+C & 6--10 & \medium & 1.5--2 h & & & \\ \hline
+D & 11--15 & \hard & 2--3 h & & & \\ \hline
+E & 16 & \easy & 20 min & & & \\ \hline
+F & 17--18 & \medium & 45 min & & & \\ \hline
+G & open & ? & open & & & \\ \hline
+\end{tabular}
+\end{center}
+
+\end{document}

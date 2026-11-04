@@ -1,0 +1,100 @@
+{
+  "created": "2026-10-27T19:35:10",
+  "settings": {
+    "reads_per_condition": 30,
+    "half_width": 8,
+    "window_cells": 17,
+    "vote_lambda": 1,
+    "repeat": 3,
+    "seed": 0,
+    "scoring": {
+      "match": 2,
+      "mismatch": -1,
+      "gap": -2
+    }
+  },
+  "machine": {
+    "python": "3.12.7",
+    "system": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel"
+  },
+  "overall": {
+    "reads": 1170,
+    "full_us": 2943.1,
+    "vote_us": 1046.1,
+    "window_us": 432.6,
+    "attention_us": 1478.8,
+    "speedup": 1.99,
+    "same_score_share": 0.8915,
+    "same_path_share": 0.8906,
+    "full_cells": 21000,
+    "window_cells": 1946,
+    "vote_comparisons": 21000
+  },
+  "by_indel_length": {
+    "0": {
+      "reads": 90,
+      "full_us": 2919.2,
+      "vote_us": 1045.0,
+      "window_us": 418.5,
+      "attention_us": 1463.5,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "1": {
+      "reads": 180,
+      "full_us": 2953.3,
+      "vote_us": 1047.0,
+      "window_us": 435.2,
+      "attention_us": 1482.2,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "2": {
+      "reads": 180,
+      "full_us": 2936.5,
+      "vote_us": 1046.4,
+      "window_us": 432.2,
+      "attention_us": 1478.6,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "3": {
+      "reads": 180,
+      "full_us": 2929.6,
+      "vote_us": 1040.4,
+      "window_us": 431.1,
+      "attention_us": 1471.4,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "5": {
+      "reads": 180,
+      "full_us": 2937.6,
+      "vote_us": 1039.3,
+      "window_us": 436.8,
+      "attention_us": 1476.1,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "8": {
+      "reads": 180,
+      "full_us": 2950.1,
+      "vote_us": 1049.7,
+      "window_us": 434.1,
+      "attention_us": 1483.9,
+      "speedup": 1.99,
+      "same_score_share": 1.0
+    },
+    "12": {
+      "reads": 180,
+      "full_us": 2963.3,
+      "vote_us": 1054.6,
+      "window_us": 433.3,
+      "attention_us": 1487.9,
+      "speedup": 1.99,
+      "same_score_share": 0.2944
+    }
+  },
+  "csv": "runtime_20261027_193510.csv"
+}
