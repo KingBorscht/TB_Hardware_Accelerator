@@ -1,0 +1,390 @@
+{
+  "created": "2026-10-27T19:38:46",
+  "settings": {
+    "variants": [
+      "ordinary",
+      "attention",
+      "attention_bits",
+      "attention_prune"
+    ],
+    "reads_per_condition": 10,
+    "half_width": 8,
+    "window_cells": 17,
+    "vote_lambda": 0,
+    "repeat": 1,
+    "seed": 0,
+    "scoring": {
+      "match": 2,
+      "mismatch": -1,
+      "gap": -2
+    }
+  },
+  "machine": {
+    "python": "3.12.7",
+    "system": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel"
+  },
+  "variants": {
+    "ordinary": {
+      "overall": {
+        "reads": 390,
+        "total_us": 3132.8,
+        "vote_us": 0.0,
+        "align_us": 3132.8,
+        "speedup_vs_ordinary": 1.0,
+        "same_score_share": 1.0,
+        "cells": 21000,
+        "vote_comparisons": 0
+      },
+      "by_indel_length": {
+        "0": {
+          "reads": 30,
+          "total_us": 3119.3,
+          "vote_us": 0.0,
+          "align_us": 3119.3,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "1": {
+          "reads": 60,
+          "total_us": 3122.4,
+          "vote_us": 0.0,
+          "align_us": 3122.4,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "2": {
+          "reads": 60,
+          "total_us": 3173.5,
+          "vote_us": 0.0,
+          "align_us": 3173.5,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "3": {
+          "reads": 60,
+          "total_us": 3126.1,
+          "vote_us": 0.0,
+          "align_us": 3126.1,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "5": {
+          "reads": 60,
+          "total_us": 3131.6,
+          "vote_us": 0.0,
+          "align_us": 3131.6,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "8": {
+          "reads": 60,
+          "total_us": 3145.3,
+          "vote_us": 0.0,
+          "align_us": 3145.3,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        },
+        "12": {
+          "reads": 60,
+          "total_us": 3104.9,
+          "vote_us": 0.0,
+          "align_us": 3104.9,
+          "speedup_vs_ordinary": 1.0,
+          "same_score_share": 1.0,
+          "cells": 21000,
+          "vote_comparisons": 0
+        }
+      }
+    },
+    "attention": {
+      "overall": {
+        "reads": 390,
+        "total_us": 1567.3,
+        "vote_us": 1107.4,
+        "align_us": 459.8,
+        "speedup_vs_ordinary": 2.0,
+        "same_score_share": 0.8923,
+        "cells": 1937,
+        "vote_comparisons": 21000,
+        "same_d0_as_full_vote_share": 1.0
+      },
+      "by_indel_length": {
+        "0": {
+          "reads": 30,
+          "total_us": 1538.6,
+          "vote_us": 1080.9,
+          "align_us": 457.7,
+          "speedup_vs_ordinary": 2.03,
+          "same_score_share": 1.0,
+          "cells": 1864,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "1": {
+          "reads": 60,
+          "total_us": 1525.4,
+          "vote_us": 1075.7,
+          "align_us": 449.7,
+          "speedup_vs_ordinary": 2.05,
+          "same_score_share": 1.0,
+          "cells": 1960,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "2": {
+          "reads": 60,
+          "total_us": 1589.4,
+          "vote_us": 1121.0,
+          "align_us": 468.3,
+          "speedup_vs_ordinary": 2.0,
+          "same_score_share": 1.0,
+          "cells": 1923,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "3": {
+          "reads": 60,
+          "total_us": 1582.1,
+          "vote_us": 1125.8,
+          "align_us": 456.3,
+          "speedup_vs_ordinary": 1.98,
+          "same_score_share": 1.0,
+          "cells": 1944,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "5": {
+          "reads": 60,
+          "total_us": 1565.6,
+          "vote_us": 1108.1,
+          "align_us": 457.5,
+          "speedup_vs_ordinary": 2.0,
+          "same_score_share": 1.0,
+          "cells": 1931,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "8": {
+          "reads": 60,
+          "total_us": 1591.5,
+          "vote_us": 1120.3,
+          "align_us": 471.2,
+          "speedup_vs_ordinary": 1.98,
+          "same_score_share": 1.0,
+          "cells": 1946,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "12": {
+          "reads": 60,
+          "total_us": 1564.1,
+          "vote_us": 1107.2,
+          "align_us": 456.9,
+          "speedup_vs_ordinary": 1.99,
+          "same_score_share": 0.3,
+          "cells": 1955,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        }
+      }
+    },
+    "attention_bits": {
+      "overall": {
+        "reads": 390,
+        "total_us": 789.2,
+        "vote_us": 329.6,
+        "align_us": 459.6,
+        "speedup_vs_ordinary": 3.97,
+        "same_score_share": 0.8923,
+        "cells": 1937,
+        "vote_comparisons": 21000,
+        "same_d0_as_full_vote_share": 1.0
+      },
+      "by_indel_length": {
+        "0": {
+          "reads": 30,
+          "total_us": 784.5,
+          "vote_us": 333.2,
+          "align_us": 451.2,
+          "speedup_vs_ordinary": 3.98,
+          "same_score_share": 1.0,
+          "cells": 1864,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "1": {
+          "reads": 60,
+          "total_us": 778.6,
+          "vote_us": 319.0,
+          "align_us": 459.6,
+          "speedup_vs_ordinary": 4.01,
+          "same_score_share": 1.0,
+          "cells": 1960,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "2": {
+          "reads": 60,
+          "total_us": 773.4,
+          "vote_us": 328.8,
+          "align_us": 444.6,
+          "speedup_vs_ordinary": 4.1,
+          "same_score_share": 1.0,
+          "cells": 1923,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "3": {
+          "reads": 60,
+          "total_us": 808.3,
+          "vote_us": 339.4,
+          "align_us": 468.9,
+          "speedup_vs_ordinary": 3.87,
+          "same_score_share": 1.0,
+          "cells": 1944,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "5": {
+          "reads": 60,
+          "total_us": 803.3,
+          "vote_us": 334.2,
+          "align_us": 469.1,
+          "speedup_vs_ordinary": 3.9,
+          "same_score_share": 1.0,
+          "cells": 1931,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "8": {
+          "reads": 60,
+          "total_us": 813.2,
+          "vote_us": 336.5,
+          "align_us": 476.7,
+          "speedup_vs_ordinary": 3.87,
+          "same_score_share": 1.0,
+          "cells": 1946,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "12": {
+          "reads": 60,
+          "total_us": 760.8,
+          "vote_us": 317.9,
+          "align_us": 443.0,
+          "speedup_vs_ordinary": 4.08,
+          "same_score_share": 0.3,
+          "cells": 1955,
+          "vote_comparisons": 21000,
+          "same_d0_as_full_vote_share": 1.0
+        }
+      }
+    },
+    "attention_prune": {
+      "overall": {
+        "reads": 390,
+        "total_us": 1773.5,
+        "vote_us": 1315.1,
+        "align_us": 458.3,
+        "speedup_vs_ordinary": 1.77,
+        "same_score_share": 0.8923,
+        "cells": 1937,
+        "vote_comparisons": 7286,
+        "same_d0_as_full_vote_share": 1.0
+      },
+      "by_indel_length": {
+        "0": {
+          "reads": 30,
+          "total_us": 1751.6,
+          "vote_us": 1257.9,
+          "align_us": 493.7,
+          "speedup_vs_ordinary": 1.78,
+          "same_score_share": 1.0,
+          "cells": 1864,
+          "vote_comparisons": 7081,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "1": {
+          "reads": 60,
+          "total_us": 1664.0,
+          "vote_us": 1206.2,
+          "align_us": 457.8,
+          "speedup_vs_ordinary": 1.88,
+          "same_score_share": 1.0,
+          "cells": 1960,
+          "vote_comparisons": 6833,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "2": {
+          "reads": 60,
+          "total_us": 1976.3,
+          "vote_us": 1521.7,
+          "align_us": 454.6,
+          "speedup_vs_ordinary": 1.61,
+          "same_score_share": 1.0,
+          "cells": 1923,
+          "vote_comparisons": 7625,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "3": {
+          "reads": 60,
+          "total_us": 1732.3,
+          "vote_us": 1276.0,
+          "align_us": 456.3,
+          "speedup_vs_ordinary": 1.8,
+          "same_score_share": 1.0,
+          "cells": 1944,
+          "vote_comparisons": 7184,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "5": {
+          "reads": 60,
+          "total_us": 1806.4,
+          "vote_us": 1357.2,
+          "align_us": 449.2,
+          "speedup_vs_ordinary": 1.73,
+          "same_score_share": 1.0,
+          "cells": 1931,
+          "vote_comparisons": 7618,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "8": {
+          "reads": 60,
+          "total_us": 1767.7,
+          "vote_us": 1302.0,
+          "align_us": 465.7,
+          "speedup_vs_ordinary": 1.78,
+          "same_score_share": 1.0,
+          "cells": 1946,
+          "vote_comparisons": 7317,
+          "same_d0_as_full_vote_share": 1.0
+        },
+        "12": {
+          "reads": 60,
+          "total_us": 1705.0,
+          "vote_us": 1256.3,
+          "align_us": 448.6,
+          "speedup_vs_ordinary": 1.82,
+          "same_score_share": 0.3,
+          "cells": 1955,
+          "vote_comparisons": 7241,
+          "same_d0_as_full_vote_share": 1.0
+        }
+      }
+    }
+  },
+  "csv": "runtime_20261027_193846.csv"
+}

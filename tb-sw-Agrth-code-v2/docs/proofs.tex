@@ -1,0 +1,850 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem*{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\DeclareMathOperator{\score}{score}
+\DeclareMathOperator{\Bin}{Bin}
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert}
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\newcommand{\W}{\mathcal{W}}
+\newcommand{\A}{\mathcal{A}}
+\newcommand{\klo}{k_{\mathrm{lo}}}
+\newcommand{\khi}{k_{\mathrm{hi}}}
+\newcommand{\kaplo}{\kappa_{\mathrm{lo}}}
+\newcommand{\kaphi}{\kappa_{\mathrm{hi}}}
+\newcommand{\Sseg}{S_{\mathrm{seg}}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+\title{Proofs for the Alignment Kernel:\\
+Diagonal Vote and Sliding-Window Smith--Waterman}
+\author{TB Hardware Accelerator project, Algorithm focus}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note states and proves the claims behind the proposed architecture: a
+diagonal vote followed by a sliding-window Smith--Waterman alignment. Each
+result is labelled \emph{Proved} (a complete proof is given), \emph{Classical}
+(a standard result, cited), \emph{Computed} (an exact value obtained from the
+reference sequences by exhaustive calculation, with no sampling), or
+\emph{Empirical} (supported only by simulated reads, and not a theorem).
+Section~\ref{sec:open} lists what is not proved.
+\end{abstract}
+
+\section*{Summary of results}
+
+\begin{center}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.62\textwidth}l@{}}
+\toprule
+Result & Claim & Status \\
+\midrule
+Lemma~\ref{lem:paths} & $H(i,j)$ is the best score of a local alignment ending at $(i,j)$ & Classical \\
+Prop.~\ref{prop:range} & $0 \le H(i,j) \le M\min(i,j)$; scores fit in 9 bits & Proved \\
+Prop.~\ref{prop:diff} & Neighbouring cells differ by a bounded amount & Proved \\
+Prop.~\ref{prop:cost} & Score equals $\tfrac{M}{2}(m+n)$ minus a shortest-path cost & Proved \\
+Prop.~\ref{prop:work} & The window computes at most $mW$ cells & Proved \\
+Prop.~\ref{prop:upper} & Window score never exceeds the full score & Proved \\
+Prop.~\ref{prop:exact} & Window score equals the full score when an optimal path fits in the window & Proved \\
+Theorem~\ref{thm:vote} & The vote lands on an acceptable diagonal when substitutions are below a margin & Proved \\
+Cor.~\ref{cor:contain} & Then the window contains the true alignment & Proved \\
+Tables~\ref{tab:margins}, \ref{tab:shares} & Values of the margin for the three loci & Computed \\
+Cor.~\ref{cor:prob} & Probability bound for the vote under independent substitutions & Proved \\
+Table~\ref{tab:hw} & Storage, cell and cycle counts & Proved \\
+Prop.~\ref{prop:votecost} & The direct vote makes exactly $mn$ base comparisons & Proved \\
+Prop.~\ref{prop:fft} & The vote can be computed in $O((m+n)\log(m+n))$ & Classical \\
+Props.~\ref{prop:updates}, \ref{prop:compares} & Wavefront update and comparison bounds & Proved \\
+Prop.~\ref{prop:segment} & Segment-vote band computes at most $mW + 2\Sseg G$ cells & Proved \\
+Prop.~\ref{prop:gate} & Expected cost with a gate & Proved \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Notation}
+
+\begin{itemize}[nosep]
+\item The read is $a = a_1 \dots a_m$ and the reference window is $b = b_1 \dots b_n$.
+\item Scores: match $M > 0$, mismatch $x \le M$, and $g < 0$ per gapped base.
+      The project uses $M = 2$, $x = -1$, $g = -2$, $m = 150$ and $n \le 180$.
+\item $s(a_i, b_j) = M$ if $a_i = b_j$, and $s(a_i,b_j) = x$ otherwise.
+\item Grid \emph{nodes} are pairs $(i,j)$ with $0 \le i \le m$ and $0 \le j \le n$.
+      A node with $i, j \ge 1$ is also called a \emph{cell}.
+\item The \emph{diagonal} of a node $(i,j)$ is $j - i$.
+\item A \emph{path} is a sequence of steps between nodes. A diagonal step
+      $(i-1,j-1) \to (i,j)$ scores $s(a_i,b_j)$. A down step $(i-1,j) \to (i,j)$
+      and a right step $(i,j-1) \to (i,j)$ each score $g$. The score of a path is
+      the sum of the scores of its steps, and the empty path scores $0$. A path is
+      a local alignment of the substrings it spans.
+\item $W = 2w + 1$ is the window width, $w$ its half-width, and $d_0$ the diagonal
+      chosen by the vote.
+\end{itemize}
+
+\section{Smith--Waterman}
+
+The recurrence below is the local alignment algorithm of Smith and
+Waterman~\cite{smith1981} with a linear gap penalty.
+
+\begin{definition}
+$H(i,0) = H(0,j) = 0$, and for $i, j \ge 1$
+\begin{equation}\label{eq:sw}
+H(i,j) = \max\bigl\{\,0,\; H(i-1,j-1) + s(a_i,b_j),\; H(i-1,j) + g,\; H(i,j-1) + g \,\bigr\}.
+\end{equation}
+The alignment score is $S = \max_{i,j} H(i,j)$.
+\end{definition}
+
+\begin{lemma}[Classical]\label{lem:paths}
+$H(i,j)$ is the maximum score over all paths that end at the node $(i,j)$, the
+empty path included.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+Induction on $i + j$. A non-empty path ending at $(i,j)$ ends with one of the
+three steps, and the rest of it is a path ending at the corresponding
+predecessor. Maximising over the last step and, by the induction hypothesis,
+over the rest gives the three non-zero terms of \eqref{eq:sw}. The empty path
+gives the term $0$. On the boundary, every non-empty path consists of gap steps
+only and has a negative score.
+\end{proof}
+
+\begin{proposition}\label{prop:range}
+$0 \le H(i,j) \le M \min(i,j)$. Consequently $0 \le S \le M\min(m,n)$, and an
+unsigned score needs $\ceil{\log_2(M\min(m,n) + 1)}$ bits.
+\end{proposition}
+
+\begin{proof}
+The lower bound is the term $0$ in \eqref{eq:sw}. For the upper bound use
+Lemma~\ref{lem:paths}. A diagonal step increases both coordinates by one, so a
+path ending at $(i,j)$ contains at most $\min(i,j)$ diagonal steps. Each scores
+at most $M$, and every other step scores $g < 0$.
+\end{proof}
+
+With the project values, $S \le 300$ and $9$ bits suffice.
+
+\section{Differences between neighbouring cells}
+
+\begin{proposition}\label{prop:diff}
+For all $1 \le i \le m$ and $1 \le j \le n$,
+\begin{align}
+g &\le H(i,j) - H(i,j-1) \le M - g, \label{eq:da}\\
+g &\le H(i,j) - H(i-1,j) \le M - g, \label{eq:db}\\
+x &\le H(i,j) - H(i-1,j-1) \le M. \label{eq:dc}
+\end{align}
+\end{proposition}
+
+\begin{proof}
+\emph{Lower bounds.} The recurrence \eqref{eq:sw} gives
+$H(i,j) \ge H(i,j-1) + g$, $H(i,j) \ge H(i-1,j) + g$, and
+$H(i,j) \ge H(i-1,j-1) + s(a_i,b_j) \ge H(i-1,j-1) + x$.
+
+\emph{Upper bounds.} First extend \eqref{eq:da} and \eqref{eq:db} to the
+boundary. For $i = 0$ and $j \ge 1$ we have $H(0,j) - H(0,j-1) = 0$, and for
+$j = 0$ and $i \ge 1$ we have $H(i,0) - H(i-1,0) = 0$. Since $g \le 0 \le M - g$,
+both inequalities hold there as well.
+
+Now argue by induction on $i + j$. Fix $i, j \ge 1$ and assume the three upper
+bounds hold at every node with a smaller coordinate sum. Consider which term
+attains the maximum in \eqref{eq:sw}.
+
+\emph{Case 0: $H(i,j) = 0$.} All three differences are at most $0$, because
+$H \ge 0$ everywhere, and $0 \le M \le M - g$.
+
+\emph{Case 1: $H(i,j) = H(i-1,j-1) + s(a_i,b_j)$.} Then
+$H(i,j) \le H(i-1,j-1) + M$, which is \eqref{eq:dc}. The extended lower bound
+\eqref{eq:db} at $(i,j-1)$ gives $H(i-1,j-1) \le H(i,j-1) - g$, hence
+$H(i,j) \le H(i,j-1) + M - g$, which is \eqref{eq:da}. The extended lower bound
+\eqref{eq:da} at $(i-1,j)$ gives $H(i-1,j-1) \le H(i-1,j) - g$, hence
+$H(i,j) \le H(i-1,j) + M - g$, which is \eqref{eq:db}.
+
+\emph{Case 2: $H(i,j) = H(i-1,j) + g$.} Then \eqref{eq:db} holds because
+$g \le M - g$. By the induction hypothesis \eqref{eq:da} at $(i-1,j)$, or its
+boundary form, $H(i-1,j) \le H(i-1,j-1) + M - g$, so
+$H(i,j) \le H(i-1,j-1) + M$, which is \eqref{eq:dc}. Combining this with
+$H(i-1,j-1) \le H(i,j-1) - g$ gives \eqref{eq:da}.
+
+\emph{Case 3: $H(i,j) = H(i,j-1) + g$.} Symmetric to Case 2, with the roles of
+$i$ and $j$ exchanged.
+\end{proof}
+
+\begin{corollary}\label{cor:bits}
+A side-by-side difference \eqref{eq:da} or \eqref{eq:db} takes one of
+$M - 2g + 1$ integer values and needs $\ceil{\log_2(M - 2g + 1)}$ bits. A
+same-diagonal difference \eqref{eq:dc} takes one of $M - x + 1$ values and needs
+$\ceil{\log_2(M - x + 1)}$ bits.
+\end{corollary}
+
+With the project values these are the ranges $-2,\dots,+4$ ($3$ bits) and
+$-1,\dots,+2$ ($2$ bits). The simulated reads showed exactly these ranges.
+
+\begin{remark}
+Proposition~\ref{prop:diff} concerns the full matrix. In a window, a cell at the
+edge has a neighbour outside the window that is read as $0$, and the bound does
+not apply to that pair. The simulation measured only pairs with both cells
+inside the window.
+\end{remark}
+
+\section{Score as a shortest-path cost}
+
+For a path $P$ from $(i_0,j_0)$ to $(i_1,j_1)$ let $\mu$, $\nu$ and $\gamma$ be
+its numbers of matches, mismatches and gap steps, and let
+\[
+u = i_0 + (m - i_1) + j_0 + (n - j_1)
+\]
+be the number of bases of $a$ and $b$ that $P$ leaves unaligned. Define the cost
+\begin{equation}\label{eq:cost}
+c(P) = (M - x)\,\nu + \Bigl(\frac{M}{2} - g\Bigr)\gamma + \frac{M}{2}\,u .
+\end{equation}
+All three coefficients are non-negative.
+
+\begin{proposition}\label{prop:cost}
+For every path $P$, $\score(P) = \frac{M}{2}(m+n) - c(P)$. Therefore
+\[
+S = \frac{M}{2}(m+n) - \min_{P} c(P).
+\]
+\end{proposition}
+
+\begin{proof}
+A diagonal step advances both coordinates and a gap step advances one of them,
+so $(i_1 - i_0) + (j_1 - j_0) = 2(\mu + \nu) + \gamma$, and hence
+$m + n = 2(\mu + \nu) + \gamma + u$. Substituting into \eqref{eq:cost},
+\begin{align*}
+\frac{M}{2}(m+n) - c(P)
+ &= M\mu + M\nu + \frac{M}{2}\gamma + \frac{M}{2}u
+    - (M - x)\nu - \frac{M}{2}\gamma + g\gamma - \frac{M}{2}u \\
+ &= M\mu + x\nu + g\gamma ,
+\end{align*}
+which is the score of $P$. The cost is therefore a decreasing function of the
+score over the same set of paths, the empty path included, so the maximum score
+corresponds to the minimum cost.
+\end{proof}
+
+With the project values the costs are $0$ (match), $3$ (mismatch), $3$ (gapped
+base) and $1$ (unaligned base), and $S = m + n - c_{\min}$. This is the quantity
+a time-coded (``first arrival'') circuit would compute. The identity was also
+checked numerically on $400$ random pairs.
+
+\section{The sliding window}
+
+\begin{definition}
+The \emph{window} is the set of cells
+\[
+\W = \bigl\{(i,j) : 1 \le i \le m,\ 1 \le j \le n,\ \abs{j - i - d_0} \le w \bigr\}.
+\]
+$H_{\W}$ is defined by the recurrence \eqref{eq:sw} on the cells of $\W$ and is
+$0$ at every other node. The window score is $S_{\W} = \max H_{\W}$.
+\end{definition}
+
+\begin{proposition}[Work]\label{prop:work}
+$\abs{\W} \le mW$. The window therefore computes at most a fraction $W/n$ of the
+$mn$ cells of the full matrix.
+\end{proposition}
+
+\begin{proof}
+For each $i$, the condition $\abs{j - i - d_0} \le w$ allows at most
+$2w + 1 = W$ values of $j$.
+\end{proof}
+
+For $m = 150$, $n = 180$ and $W = 17$ this is $2{,}550$ against $27{,}000$
+cells, or $9.4\%$.
+
+Call a path \emph{admissible} if every node on it, except possibly its start
+node, is a cell of $\W$.
+
+\begin{lemma}\label{lem:window}
+For a cell $(i,j) \in \W$, $H_{\W}(i,j)$ is the maximum score over admissible
+paths ending at $(i,j)$, the empty path included.
+\end{lemma}
+
+\begin{proof}
+Induction on $i + j$. Let $p$ be a predecessor of $(i,j)$ and let $\sigma$ be
+the score of the step from $p$ to $(i,j)$.
+
+If $p \notin \W$, the recurrence uses $H_{\W}(p) = 0$ and the candidate value is
+$\sigma$. That is the score of the one-step path from $p$, which is admissible
+because $p$ is its start node. No longer admissible path passes through $p$,
+because $p$ would then be a node other than the start node that lies outside
+$\W$.
+
+If $p \in \W$, the candidate value is $H_{\W}(p) + \sigma$. By the induction
+hypothesis $H_{\W}(p)$ is the best score of an admissible path ending at $p$,
+and appending the step keeps the path admissible. Conversely, an admissible path
+whose last step comes from $p$ is an admissible path ending at $p$ followed by
+that step.
+
+Taking the maximum over the three predecessors and the empty path gives the
+recurrence.
+\end{proof}
+
+\begin{proposition}\label{prop:upper}
+$S_{\W} \le S$.
+\end{proposition}
+
+\begin{proof}
+By Lemmas~\ref{lem:paths} and~\ref{lem:window}, $S_{\W}$ is a maximum over a
+subset of the paths whose maximum is $S$.
+\end{proof}
+
+\begin{lemma}\label{lem:interval}
+The diagonals of the nodes of a path form a set of consecutive integers
+$\{\klo, \dots, \khi\}$, and $\khi - \klo \le \gamma$, the number of gap steps of
+the path.
+\end{lemma}
+
+\begin{proof}
+A diagonal step leaves the diagonal unchanged, a right step raises it by $1$ and
+a down step lowers it by $1$. A sequence of integers that changes by at most $1$
+at each step takes every value between its minimum and its maximum, and its
+range is at most the number of steps that change it.
+\end{proof}
+
+\begin{proposition}[Exactness]\label{prop:exact}
+Suppose $S > 0$ and some optimal path $P^{*}$ has diagonal range
+$[\klo, \khi]$ with
+\begin{equation}\label{eq:fits}
+\khi - w \;\le\; d_0 \;\le\; \klo + w .
+\end{equation}
+Then $S_{\W} = S$. In particular this holds if $d_0$ is one of the diagonals of
+$P^{*}$ and $P^{*}$ has at most $w$ gap steps.
+\end{proposition}
+
+\begin{proof}
+An optimal path with positive score does not begin with a gap step, since
+deleting that step would raise the score by $-g > 0$. So $P^{*}$ begins with a
+diagonal step, and every node after its start node has $i \ge 1$ and $j \ge 1$;
+that is, it is a cell. By \eqref{eq:fits} every diagonal $k$ of $P^{*}$
+satisfies $\abs{k - d_0} \le w$, so those cells lie in $\W$ and $P^{*}$ is
+admissible. Lemma~\ref{lem:window} gives $S_{\W} \ge \score(P^{*}) = S$, and
+Proposition~\ref{prop:upper} gives equality.
+
+For the last sentence, if $d_0 \in [\klo,\khi]$ and $\gamma \le w$, then
+Lemma~\ref{lem:interval} gives $\khi - \klo \le w$, and therefore
+$\khi - w \le \klo \le d_0 \le \khi \le \klo + w$.
+\end{proof}
+
+If $S = 0$ then $S_{\W} = 0$ as well, because $0 \le S_{\W} \le S$.
+
+\begin{remark}
+Proposition~\ref{prop:exact} is conditional. Whether the vote produces a $d_0$
+that satisfies its hypothesis is the subject of Section~\ref{sec:vote}.
+\end{remark}
+
+\section{The diagonal vote}\label{sec:vote}
+
+In this section indices start at $0$. The read is $r_0 \dots r_{m-1}$ and the
+window is $b_0 \dots b_{n-1}$. Diagonal $k$ pairs $r_i$ with $b_{i+k}$, which is
+the same numbering of diagonals as before.
+
+\begin{definition}[Vote]
+For $-(m-1) \le k \le n-1$ let
+\begin{align*}
+I(k) &= \{\, i : 0 \le i < m,\ 0 \le i + k < n \,\}, & N(k) &= \abs{I(k)},\\
+V_r(k) &= \abs[\big]{\{\, i \in I(k) : r_i = b_{i+k} \,\}}, &
+Z_r(k) &= (1+\lambda)\,V_r(k) - \lambda\,N(k),
+\end{align*}
+for a fixed penalty $\lambda \ge 0$. $N(k)$ is the number of compared positions
+and depends only on $k$, $m$ and $n$. $Z_r(k)$ equals the number of matches
+minus $\lambda$ times the number of mismatches. The vote returns a diagonal
+$d_0$ that maximises $Z_r$. With $\lambda = 0$ it counts matches; with
+$\lambda = 1$ it is matches minus mismatches.
+\end{definition}
+
+\begin{definition}[Read model]
+Let $E$ be the reference genome around the window, with $b_j = E[\omega + j]$. A
+\emph{template} $t_0 \dots t_{m-1}$ is given by a start $p$ and at most one
+indel of length $g$ at read position $q$:
+\begin{itemize}[nosep]
+\item no indel: $t_i = E[p+i]$;
+\item deletion: $t_i = E[p+i]$ for $i < q$, and $t_i = E[p+g+i]$ for $i \ge q$;
+\item insertion: $t_i = E[p+i]$ for $i < q$, $t_i$ is unconstrained for
+      $q \le i < q+g$, and $t_i = E[p-g+i]$ for $i \ge q+g$.
+\end{itemize}
+Let $F$ be the set of unconstrained positions, which is empty unless there is an
+insertion. A read $r$ \emph{follows the template with at most $e$ substitutions}
+if $r_i = t_i$ for all $i \notin F$ except at most $e$ positions.
+\end{definition}
+
+The \emph{true diagonals} are $k_1 = p - \omega$ for the part before the indel,
+and $k_2 = k_1$ (no indel), $k_2 = k_1 + g$ (deletion) or $k_2 = k_1 - g$
+(insertion) for the part after it. Write $\kaplo = \min(k_1,k_2)$ and
+$\kaphi = \max(k_1,k_2)$. The \emph{true alignment} $T$ pairs each read base
+with the reference base it was copied from, wherever that base lies in the
+window. All its diagonals lie in $[\kaplo,\kaphi]$.
+
+A diagonal $d$ is \emph{acceptable} if the window centred on it contains every
+true diagonal:
+\[
+\A = \{\, d : \kaphi - w \le d \le \kaplo + w \,\}.
+\]
+
+For the template alone define the pessimistic and optimistic match counts
+\[
+V^{-}(k) = \abs[\big]{\{\, i \in I(k)\setminus F : t_i = b_{i+k} \,\}},
+\qquad
+V^{+}(k) = V^{-}(k) + \abs{I(k) \cap F},
+\]
+and $Z^{\pm}(k) = (1+\lambda)V^{\pm}(k) - \lambda N(k)$. The \emph{margin} of the
+template is
+\begin{equation}\label{eq:margin}
+\Delta_\lambda = \max_{k \in \A} Z^{-}(k) \;-\; \max_{k \notin \A} Z^{+}(k).
+\end{equation}
+Here $k$ ranges over $-(m-1),\dots,n-1$. We assume $g \le 2w$, so that $\A$ is
+not empty. If every diagonal is acceptable, the second maximum is over an empty
+set and is taken to be $-\infty$.
+The margin depends only on $E$, the window, $m$, $w$, $\lambda$ and the template
+parameters $(p, q, g, \text{type})$. It can be computed before any read is seen.
+
+\begin{lemma}\label{lem:perturb}
+If $r$ follows the template with at most $e$ substitutions, then for every $k$
+\[
+V^{-}(k) - e \;\le\; V_r(k) \;\le\; V^{+}(k) + e .
+\]
+\end{lemma}
+
+\begin{proof}
+Split $I(k)$ into three sets. On positions outside $F$ where $r_i = t_i$, the
+read and the template give the same indicator. On the at most $e$ substituted
+positions, each indicator changes by at most $1$. On positions in $F$ the read
+contributes between $0$ and $1$ each, which lies between the contribution
+counted in $V^{-}$ (none) and in $V^{+}$ (all).
+\end{proof}
+
+\begin{theorem}[Vote]\label{thm:vote}
+If $r$ follows the template with at most $e$ substitutions and
+\begin{equation}\label{eq:votecond}
+2\,(1+\lambda)\,e \;<\; \Delta_\lambda ,
+\end{equation}
+then every maximiser of $Z_r$ is acceptable.
+\end{theorem}
+
+\begin{proof}
+Let $k_A \in \A$ attain $\max_{k \in \A} Z^{-}(k)$. By Lemma~\ref{lem:perturb},
+$Z_r(k_A) \ge Z^{-}(k_A) - (1+\lambda)e$. For any $k \notin \A$,
+Lemma~\ref{lem:perturb}, the definition \eqref{eq:margin} and the hypothesis
+\eqref{eq:votecond} give
+\[
+Z_r(k) \le Z^{+}(k) + (1+\lambda)e
+       \le Z^{-}(k_A) - \Delta_\lambda + (1+\lambda)e
+       <   Z^{-}(k_A) - (1+\lambda)e
+       \le Z_r(k_A).
+\]
+So no diagonal outside $\A$ maximises $Z_r$.
+\end{proof}
+
+\begin{corollary}[The window contains the true alignment]\label{cor:contain}
+Under the hypothesis of Theorem~\ref{thm:vote}, the window centred on $d_0$
+contains every diagonal of the true alignment $T$, and
+\[
+\score(T) \;\le\; S_{\W} \;\le\; S .
+\]
+\end{corollary}
+
+\begin{proof}
+$d_0 \in \A$ means $d_0 - w \le \kaplo$ and $\kaphi \le d_0 + w$, so every
+diagonal of $T$ is within $w$ of $d_0$. Take $T$ restricted to the grid,
+starting at its first paired base. Its nodes after the start node are cells on
+those diagonals, so the path is admissible, and Lemma~\ref{lem:window} gives
+$\score(T) \le S_{\W}$. The second inequality is Proposition~\ref{prop:upper}.
+\end{proof}
+
+\begin{remark}
+This is the guarantee that matters for calling mutations: the window cannot lose
+the alignment the read actually came from. It does not assert $S_{\W} = S$; see
+Section~\ref{sec:open}.
+\end{remark}
+
+\subsection{Margins for the three loci (Computed)}\label{sec:margins}
+
+The script \code{reference/vote_margin.py} evaluates $\Delta_\lambda$ exactly
+for $m = 150$, $w = 8$, every read start for which the read covers the hotspot
+centre with at least $20$~bp on each side ($111$ starts per locus), every indel
+position, every length $g = 1,\dots,8$ and both indel types. That is $260{,}739$
+templates per locus and $782{,}217$ in total. The windows are $180$~bp for rpoB
+and $120$~bp for katG and inhA, taken from NC\_000962.3. The window coordinates
+are provisional.
+
+Table~\ref{tab:margins} gives the minimum margin and the largest $e$ that
+satisfies \eqref{eq:votecond}. Table~\ref{tab:shares} gives the share of
+templates for which the vote is guaranteed with at least $e$ substitutions.
+These shares weight every template equally; they are not probabilities over real
+reads.
+
+\begin{table}[ht]
+\centering
+\caption{Minimum margin $\Delta_\lambda$ over all templates, and the largest
+tolerated number of substitutions $e$.}\label{tab:margins}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+ & & \multicolumn{2}{c}{$\lambda = 0$} & \multicolumn{2}{c}{$\lambda = 1$} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Locus & Case & $\min\Delta$ & $e$ & $\min\Delta$ & $e$ \\
+\midrule
+rpoB & no indel            & 56   & 27   & 106 & 26 \\
+rpoB & deletion $\le 8$    & 5    & 2    & 12  & 2  \\
+rpoB & insertion $\le 8$   & $-4$ & none & 10  & 2  \\
+katG & no indel            & 32   & 15   & 78  & 19 \\
+katG & deletion $\le 8$    & 1    & 0    & 9   & 2  \\
+katG & insertion $\le 8$   & $-9$ & none & 4   & 0  \\
+inhA & no indel            & 36   & 17   & 78  & 19 \\
+inhA & deletion $\le 8$    & 5    & 2    & 14  & 3  \\
+inhA & insertion $\le 8$   & $-4$ & none & 9   & 2  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Share of all $782{,}217$ templates for which the vote is guaranteed
+with at least $e$ substitutions.}\label{tab:shares}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$e$ & 0 & 1 & 2 & 3 & 5 & 8 \\
+\midrule
+$\lambda = 0$ & 99.91\% & 99.83\% & 99.70\% & 99.50\% & 98.79\% & 96.55\% \\
+$\lambda = 1$ & 100\%   & $>99.99\%$ & $>99.99\%$ & 99.95\% & 98.99\% & 92.61\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The tables support four statements.
+\begin{enumerate}
+\item \emph{With the plain match count ($\lambda = 0$) the vote is not
+      guaranteed.} For some insertion templates the margin is negative, so a
+      wrong diagonal can win even with no substitution at all. The cause is that
+      a diagonal on which more of the read overlaps the window accumulates
+      chance matches over more positions. The sequence is GC-rich, and about
+      $40\%$ of unrelated positions match.
+\item \emph{With $\lambda = 1$ every template has a positive margin.} A read
+      with no substitutions always votes for an acceptable diagonal, for every
+      start and every single indel of up to $8$~bp at all three loci.
+\item \emph{Reads without an indel are safe by a wide margin} under either
+      statistic: at least $15$ substitutions are tolerated.
+\item \emph{Indel reads have thin worst-case margins.} A few templates tolerate
+      no substitution, or only two. The bound is adversarial: it assumes that
+      every substitution removes a match from the true diagonal and adds one to
+      the same wrong diagonal. It is therefore conservative.
+\end{enumerate}
+
+The hardware cost of $\lambda = 1$ is small. $Z(k) = 2V(k) - N(k)$, and $N(k)$
+is a function of the shift only, so it needs one counter and one subtraction.
+
+\begin{corollary}[Independent substitutions]\label{cor:prob}
+Suppose each of the $m$ read bases is substituted independently with probability
+$\varepsilon$, and the template tolerates $e^{*}$ substitutions. Then
+\[
+\Pr[\text{the vote is not acceptable}]
+\;\le\; \Pr\bigl[\Bin(m,\varepsilon) > e^{*}\bigr]
+= \sum_{i > e^{*}} \binom{m}{i}\,\varepsilon^{i}(1-\varepsilon)^{m-i}.
+\]
+\end{corollary}
+
+\begin{proof}
+By Theorem~\ref{thm:vote}, the vote can fail only if more than $e^{*}$
+substitutions occur.
+\end{proof}
+
+For $m = 150$ the bound evaluates as follows.
+\begin{center}
+\begin{tabular}{@{}rlccc@{}}
+\toprule
+$e^{*}$ & Applies to & $\varepsilon = 0.005$ & $\varepsilon = 0.01$ & $\varepsilon = 0.02$ \\
+\midrule
+19 & every read without an indel, $\lambda = 1$
+   & $1.9\times10^{-22}$ & $1.0\times10^{-16}$ & $3.1\times10^{-11}$ \\
+3  & $99.95\%$ of templates, $\lambda = 1$
+   & $7.1\times10^{-3}$ & $6.5\times10^{-2}$ & $3.5\times10^{-1}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The second row is weak because the bound is adversarial, not because the vote
+fails that often. Here $\varepsilon$ must include true SNPs as well as
+sequencing errors.
+
+\paragraph{Empirical check.}
+On $16{,}500$ simulated reads (SNPs, $0.5\%$ errors, indels of up to $8$~bp),
+the $W = 17$ window disagreed with full Smith--Waterman on $1$ read with either
+statistic, although the two statistics chose different diagonals on $143$ reads.
+The change to $\lambda = 1$ therefore buys a guarantee; it showed no measurable
+difference in simulation.
+
+\section{Storage, cells and cycles}
+
+Table~\ref{tab:hw} follows by counting.
+
+\begin{table}[ht]
+\centering
+\caption{Hardware quantities for $m = 150$, $n = 180$, $W = 17$.}\label{tab:hw}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Quantity & Full SW, systolic & Window SW & Diagonal vote, streaming \\
+\midrule
+DP cells in hardware & $\min(m,n) = 150$ & $W = 17$ & none ($m$ two-bit comparators) \\
+Cycles per read      & $m + n - 1 = 329$ & $m = 150$ & $m + n - 1 = 329$ \\
+Traceback bits       & $2mn = 54{,}000$  & $2mW = 5{,}100$ & none \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+\item Without pipelining, one read takes $(m + n - 1) + m = 479$ cycles through
+      the vote and the window. That is more than the $329$ cycles of a full
+      systolic array.
+\item With the two stages pipelined, throughput is set by the vote: one read per
+      $m + n - 1$ cycles, the same as the full array.
+\item For the dynamic-programming part alone, the product of cells and cycles
+      falls from about $\min(m,n)\,(m+n)$ to $mW$.
+\end{itemize}
+The design therefore reduces area and storage. It does not reduce the number of
+clock cycles per read.
+
+\section{Cost of the vote}
+
+\begin{proposition}\label{prop:votecost}
+Computing $V(k)$ for every $k$ by direct comparison uses exactly $mn$ base
+comparisons.
+\end{proposition}
+
+\begin{proof}
+$\sum_k N(k)$ counts the pairs $(i,j)$ with $0 \le i < m$ and $0 \le j < n$,
+each exactly once, on its diagonal $k = j - i$.
+\end{proof}
+
+In a sequential model the direct vote is therefore $\Theta(mn)$, the same order
+as full Smith--Waterman. Its advantage there is the constant: a two-bit
+comparison against a cell update. With machine words of $\omega$ bits the
+comparisons pack into $O(mn/\omega)$ word operations.
+
+\begin{proposition}[Classical]\label{prop:fft}
+All values $V(k)$ can be computed in $O\bigl((m+n)\log(m+n)\bigr)$ time.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+\[
+V(k) = \sum_{c \in \{\mathrm{A},\mathrm{C},\mathrm{G},\mathrm{T}\}}
+       \sum_{i} [r_i = c]\,[b_{i+k} = c].
+\]
+For each letter $c$ the inner sum is a cross-correlation of two $0/1$ vectors,
+which a fast Fourier transform computes for all $k$ at once. Four transforms
+suffice. This is the match-counting technique of Fischer and
+Paterson~\cite{fischer1974}.
+\end{proof}
+
+Hence the vote followed by the window costs $O\bigl((m+n)\log(m+n) + mW\bigr)$
+in a sequential model, which is below $\Theta(mn)$ when $W = o(n)$. The hardware
+does not use this method, so this bound is not a claim about the hardware.
+
+\section{The wavefront alternative}
+
+This section concerns Myers's algorithm~\cite{myers1986} for two strings of
+lengths $N_a$ and $N_b$. Let $D$ be the minimum number of single-base insertions
+and deletions that turn one string into the other; a substitution counts as $2$.
+Place the strings on a grid with coordinates $(x,y)$ and number the diagonals by
+$k = x - y$. A horizontal step raises $x$ and $k$, a vertical step raises $y$
+and lowers $k$, and a diagonal step along a match is free.
+
+The algorithm works in rounds $d = 0, 1, 2, \dots$. In round $d$ it visits the
+diagonals $k = -d, -d+2, \dots, d$. For each it takes the starting point
+\begin{equation}\label{eq:start}
+x_{\mathrm{start}}(d,k) = \max\bigl\{\, x(d-1,k-1) + 1,\; x(d-1,k+1) \,\bigr\}
+\end{equation}
+and then slides along matches as far as possible, which gives $x(d,k)$. It stops
+when a slide reaches $(N_a, N_b)$.
+
+\begin{lemma}[Classical~\cite{myers1986}]\label{lem:myers}
+$x(d,k)$ is the largest $x$ on diagonal $k$ that is reachable from the origin
+with exactly $d$ non-diagonal steps.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+Any path to diagonal $k$ with $d$ non-diagonal steps makes its last such step
+from diagonal $k-1$ or $k+1$ after $d-1$ of them. Replacing its prefix by the
+furthest-reaching path on that diagonal does not move the landing point of the
+step backwards, and sliding along matches afterwards only moves it forwards.
+Induct on $d$.
+\end{proof}
+
+It follows that the algorithm stops in round $D$.
+
+\begin{proposition}[Updates]\label{prop:updates}
+The number $U$ of (round, diagonal) updates satisfies
+\[
+\frac{D(D+1)}{2} + 1 \;\le\; U \;\le\; \frac{(D+1)(D+2)}{2}.
+\]
+\end{proposition}
+
+\begin{proof}
+Round $d$ has $d + 1$ diagonals. Rounds $0, \dots, D-1$ run in full, which is
+$\sum_{d=0}^{D-1}(d+1) = D(D+1)/2$ updates. Round $D$ makes at least $1$ and at
+most $D + 1$.
+\end{proof}
+
+\begin{proposition}[Comparisons]\label{prop:compares}
+The number $C$ of base comparisons satisfies
+\[
+C \;\le\; U + (2D+1)\min(N_a, N_b).
+\]
+\end{proposition}
+
+\begin{proof}
+Each slide ends at its first mismatch or at the edge of the grid, so there is at
+most one failed comparison per update, and at most $U$ in total.
+
+A successful comparison advances the slide by one point on its diagonal. We show
+that no point is passed twice. Let $(x,y)$ be the point where the slide on
+diagonal $k$ stopped in round $d - 2$. A vertical step from it lands on diagonal
+$k - 1$ with the same $x$, so $x(d-1,k-1) \ge x$. A horizontal step lands on
+diagonal $k + 1$ at $x + 1$, so $x(d-1,k+1) \ge x + 1$. If one of these steps
+would leave the grid, the other still gives the bound, or the starting point
+falls outside the grid and the slide makes no comparison. By \eqref{eq:start},
+$x_{\mathrm{start}}(d,k) \ge x + 1$: each slide begins beyond the point where
+the previous slide on the same diagonal stopped.
+
+At most $2D + 1$ diagonals are ever visited, and a diagonal has at most
+$\min(N_a, N_b)$ points.
+\end{proof}
+
+\begin{corollary}\label{cor:wfcost}
+The worst-case work of the wavefront algorithm is
+$O\bigl(D\min(N_a,N_b) + D^2\bigr)$.
+\end{corollary}
+
+Both bounds were checked on $3{,}000$ random pairs with no violation. For highly
+similar sequences the observed work is close to $N + D^2$, because almost all
+matches lie on one diagonal. That is an empirical observation, with an
+expected-case analysis in the literature. It is not a worst-case bound.
+
+\section{The segment-vote band}
+
+Split the read into consecutive segments of length at most $\Sseg$. Segment $t$
+votes for a diagonal $d_t$. A row in segment $t$ computes the diagonals from
+$\min(d_{t-1},d_t,d_{t+1}) - w$ to $\max(d_{t-1},d_t,d_{t+1}) + w$, where a
+missing neighbour is omitted. Let $G = \sum_t \abs{d_{t+1} - d_t}$.
+
+\begin{proposition}\label{prop:segment}
+The number of cells computed is at most $mW + 2\Sseg G$.
+\end{proposition}
+
+\begin{proof}
+A row in segment $t$ computes at most $R_t + W$ cells, where $R_t$ is the range
+of $\{d_{t-1}, d_t, d_{t+1}\}$. The range of three numbers is at most the sum of
+the two consecutive absolute differences, so
+$R_t \le \abs{d_t - d_{t-1}} + \abs{d_{t+1} - d_t}$. Summing over the at most
+$\Sseg$ rows of each segment and over all segments,
+\[
+\text{cells} \;\le\; mW + \Sseg \sum_t R_t \;\le\; mW + 2\Sseg G ,
+\]
+since each difference $\abs{d_{t+1} - d_t}$ appears in at most two of the $R_t$.
+\end{proof}
+
+With no indel, $G = 0$ and the count is at most $mW$. With one indel of length
+$g$, $G = g$. In the worst case the band covers the whole matrix.
+
+\begin{remark}
+This bounds the work only. The segment-vote band missed $7$--$13\%$ of
+$5$--$12$~bp indels in simulation, all within one segment length of the end of
+the overlap, and there is no correctness theorem for it.
+\end{remark}
+
+\section{The gate}
+
+\begin{proposition}\label{prop:gate}
+If a read passes the gate with probability $\rho$, the vote costs
+$C_{\mathrm{vote}}$ and the window costs $C_{\mathrm{SW}}$, then the expected
+cost per read is
+\[
+\mathbb{E}[T] = C_{\mathrm{vote}} + (1 - \rho)\,C_{\mathrm{SW}},
+\qquad
+C_{\mathrm{vote}} \le \mathbb{E}[T] \le C_{\mathrm{vote}} + C_{\mathrm{SW}} .
+\]
+\end{proposition}
+
+\begin{proof}
+Every read pays for the vote. The window runs with probability $1 - \rho$. The
+claim follows by linearity of expectation.
+\end{proof}
+
+The value of $\rho$ is empirical. It depends on the threshold, which has not
+been chosen, and on the reads.
+
+\section{What is not proved}\label{sec:open}
+
+\begin{enumerate}
+\item \textbf{$S_{\W} = S$ in general.} Corollary~\ref{cor:contain} gives
+      $\score(T) \le S_{\W} \le S$. Full Smith--Waterman may find a
+      higher-scoring alignment that leaves the window, and nothing here excludes
+      that. In simulation it happened in about $1$ read in $16{,}500$.
+\item \textbf{The vote for reads outside the model.} Theorem~\ref{thm:vote}
+      covers one indel of length at most $w$ together with substitutions. Reads
+      with two or more indels, chimeric reads, and reads from elsewhere in the
+      genome are not covered.
+\item \textbf{The vote with $\lambda = 0$.} The margin is negative for some
+      templates, so there is no guarantee.
+\item \textbf{The margins on the final windows.} Section~\ref{sec:margins} used
+      provisional window coordinates and forward-strand reads. The numbers must
+      be recomputed once the coordinates and the strand handling are fixed.
+\item \textbf{The gate.} There is no theorem about which reads may skip
+      Smith--Waterman. In simulation, $3.6\%$ of indel reads had an ungapped
+      score equal to the full score because the indel was within $14$~bp of the
+      end of the overlap.
+\item \textbf{The segment-vote band and the adaptive band.} Only the work bound
+      of Proposition~\ref{prop:segment} is proved. The adaptive band was worse
+      than a fixed band in simulation.
+\item \textbf{Typical-case cost of the wavefront method.}
+      Propositions~\ref{prop:updates} and~\ref{prop:compares} are worst-case
+      bounds only.
+\item \textbf{Speed and power of real hardware.} Table~\ref{tab:hw} counts cells
+      and cycles. Clock frequency, routing and power have not been measured.
+\end{enumerate}
+
+\section*{Scripts}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.47\textwidth}>{\raggedright\arraybackslash}p{0.47\textwidth}@{}}
+\toprule
+Result & Script \\
+\midrule
+Margins (Tables~\ref{tab:margins}, \ref{tab:shares}) & \code{reference/vote_margin.py} \\
+Difference ranges (Corollary~\ref{cor:bits}) & \code{reference/ideas_study.py} \newline \code{reference/window_study.py} \\
+Window and vote on simulated reads & \code{reference/band_study.py} \\
+Wavefront counts (Propositions~\ref{prop:updates}, \ref{prop:compares}) & \code{reference/ideas_study.py} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{9}
+
+\bibitem{smith1981}
+T.~F. Smith and M.~S. Waterman.
+\newblock Identification of common molecular subsequences.
+\newblock \emph{Journal of Molecular Biology}, 147(1):195--197, 1981.
+
+\bibitem{myers1986}
+E.~W. Myers.
+\newblock An {$O(ND)$} difference algorithm and its variations.
+\newblock \emph{Algorithmica}, 1:251--266, 1986.
+
+\bibitem{fischer1974}
+M.~J. Fischer and M.~S. Paterson.
+\newblock String-matching and other products.
+\newblock In \emph{Complexity of Computation}, SIAM--AMS Proceedings, volume~7,
+  pages 113--125, 1974.
+
+\end{thebibliography}
+
+\end{document}
