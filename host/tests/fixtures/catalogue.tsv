@@ -1,0 +1,2 @@
+# catalogue_id	amplicon_id	reference_offset	reference	alternate	gene	annotation	catalogue_version
+TEST-C2T	0	1	C	T	test_gene	p.Test	WHO-test
